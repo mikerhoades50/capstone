@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="Calc.html">Calculator</a>
+      <a href="inv.html">Inventory</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>Inventory Viewer</h1>
+      
+      <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap;">
+        <input type="text" id="searchInput" placeholder="Search inventory..." 
+               style="width: 320px; padding: 12px; font-size: 1.05rem;">
+        <button id="refreshBtn">Refresh</button>
+        <button id="addNewBtn">+ Add New Record</button>
+      </div>
+    </div>
+
+    <table id="invTable">
+      <thead id="invThead"></thead>
+      <tbody id="invTbody"></tbody>
+    </table>
+
+    <div id="status"></div>
+  </div>
+
+  <!-- Record Modal -->
+  <div id="recordModal" class="modal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Add New Record</h2>
+      <div id="modalForm"></div>
+      <div class="modal-buttons">
+        <button id="cancelModalBtn" class="cancel-btn">Cancel</button>
+        <button id="saveModalBtn" class="save-btn-modal">Save Record</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="theme.js"></script>
+  <script type="module" src="inv.js"></script>
+</body>
+</html>
