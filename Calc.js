@@ -13,8 +13,10 @@ const oilCard = document.getElementById('oilCard');
 const batchesUntilOilEl = document.getElementById('batchesUntilOil');
 
 const sizeConfig = {
-  small: {rows:4, bags:10}, medium:{rows:5, bags:15}, 
-  large: {rows:6, bags:25}, xl:{rows:7, bags:35}
+  small: {rows:4, bags:10}, 
+  medium:{rows:5, bags:15}, 
+  large: {rows:6, bags:25}, 
+  xl:{rows:7, bags:35}
 };
 
 function getCurrentValues() {
@@ -41,8 +43,7 @@ function createRows(count, prevA = [], prevB = [], prevC = []) {
 }
 
 function attachInputListeners() {
-  const table = document.getElementById('dataTable');
-  table.addEventListener('input', updateTotals);
+  document.getElementById('dataTable').addEventListener('input', updateTotals);
 }
 
 function updateTotals() {
@@ -76,7 +77,6 @@ async function loadLastBatch() {
   const machineId = machineSizeSelect.value;
 
   try {
-    // Load batch data
     const { data: batchData } = await supabase
       .from('batches')
       .select('*')
@@ -146,7 +146,6 @@ async function saveBatchToDatabase() {
     user_id: userId,
     machine_id: machineId,
     food_name: foodName,
-    oil_change: 0,
     wet_weight: Math.round(wetWeight),
     dry_weight: Math.round(dryWeight),
     food_weight: Math.round(foodWeight),
@@ -154,12 +153,13 @@ async function saveBatchToDatabase() {
     water_amount: waterAmount,
     complete: false,
     food_per_bag: foodPerBag
+    // oil_change is preserved - NOT overwritten
   };
 
   try {
     const { data: latest } = await supabase
       .from('batches')
-      .select('id')
+      .select('id, oil_change')
       .eq('user_id', userId)
       .eq('machine_id', machineId)
       .order('id', { ascending: false })
@@ -167,8 +167,10 @@ async function saveBatchToDatabase() {
 
     let error;
     if (latest && latest.length > 0) {
+      batchData.oil_change = latest[0].oil_change || 0;
       ({ error } = await supabase.from('batches').update(batchData).eq('id', latest[0].id));
     } else {
+      batchData.oil_change = 0;
       ({ error } = await supabase.from('batches').insert([batchData]));
     }
 
@@ -178,6 +180,18 @@ async function saveBatchToDatabase() {
     alert('❌ Failed to save batch:\n' + err.message);
   }
 }
+
+function startNewBatch() {
+  document.querySelectorAll('.col-a, .col-b, .col-c').forEach(input => input.value = '');
+  foodNameInput.value = '';
+
+  const size = machineSizeSelect.value;
+  bagsInput.value = sizeConfig[size].bags;
+
+  updateTotals();
+}
+
+/* ==================== Add to Inventory Functions ==================== */
 
 async function showAddToInventoryModal() {
   const userId = parseInt(userIdSelect.value);
@@ -231,7 +245,7 @@ async function saveToInventory() {
     const { error: insertError } = await supabase.from('inv').insert([record]);
     if (insertError) throw insertError;
 
-    // Increment oil_change immediately
+    // Increment oil_change
     const { data: current } = await supabase
       .from('batches')
       .select('oil_change')
@@ -267,7 +281,6 @@ async function resetOilChange() {
       .update({ oil_change: 0 })
       .eq('user_id', userId)
       .eq('machine_id', machineId);
-
     if (error) throw error;
     loadLastBatch();
   } catch (err) {
@@ -277,6 +290,7 @@ async function resetOilChange() {
 
 // Event Listeners
 document.getElementById('saveToDbBtn').addEventListener('click', saveBatchToDatabase);
+document.getElementById('startNewBtn').addEventListener('click', startNewBatch);
 document.getElementById('addToInventoryBtn').addEventListener('click', showAddToInventoryModal);
 document.getElementById('saveInventoryBtn').addEventListener('click', saveToInventory);
 document.getElementById('cancelInventoryBtn').addEventListener('click', () => {

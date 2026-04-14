@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Batch Weight Calculator</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <!-- Navigation Bar -->
   <nav class="navbar">
@@ -19,7 +21,7 @@
   <div class="container">
     <div class="header">
       <h1>Batch Weight Calculator</h1>
-      
+
       <div style="display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 20px;">
         <div class="oil-card" id="oilCard">
           Batches until Oil Change<br>
@@ -30,9 +32,15 @@
         <div class="machine-select-group">
           <label for="userId">User ID:</label>
           <select id="userId">
-            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
             <option value="10" selected>10</option>
           </select>
 
@@ -46,56 +54,71 @@
         </div>
       </div>
 
-      <div class="save-section">
+      <div class="save-section" style="margin-bottom: 40px;">
         <label for="foodName">Food Name:</label>
         <input type="text" id="foodName" placeholder="e.g. Chicken, Salmon, Beef" style="min-width: 280px;">
         <button id="saveToDbBtn" class="save-btn">💾 Save / Update Batch</button>
+        <button id="startNewBtn" class="reset-btn">Start New Batch</button>
+      </div>
+
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>Weight Before</th>
+            <th>Weight After</th>
+            <th>Food Weight</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>Total Before: <span id="totalA">0</span> g</td>
+            <td>Total After: <span id="totalB">0</span> g</td>
+            <td>Total Food: <span id="totalC">0</span> g</td>
+          </tr>
+        </tfoot>
+      </table>
+
+<div class="summary-box">
+      <div class="summary-container">
+        <div class="summary-card water" id="waterBox">
+          Water Weight: <span id="waterWeight">0</span> g
+        </div>
+        <div class="summary-card food" id="foodBox">
+          Food Weight: <span id="foodWeight">0</span> g
+        </div>
+        <div class="summary-card ratio" id="ratioBox">
+          Water / Food Ratio: <span id="waterFoodRatio" class="ratio-value">0.00</span>
+        </div>
       </div>
     </div>
 
-    <table id="dataTable">
-      <thead><tr><th>Weight Before</th><th>Weight After</th><th>Food Weight</th></tr></thead>
-      <tbody id="tableBody"></tbody>
-      <tfoot>
-        <tr class="total-row">
-          <td>Total Before: <span id="totalA">0</span> g</td>
-          <td>Total After: <span id="totalB">0</span> g</td>
-          <td>Total Food: <span id="totalC">0</span> g</td>
-        </tr>
-      </tfoot>
-    </table>
-
-    <div class="summary-container">
-      <div class="summary-card water" id="waterBox">Water Weight<br><span id="waterWeight" style="font-size:1.6rem;">0</span> g</div>
-      <div class="summary-card food" id="foodBox">Food Weight<br><span id="foodWeight" style="font-size:1.6rem;">0</span> g</div>
-      <div class="summary-card ratio" id="ratioBox">Water / Food Ratio<br><span id="waterFoodRatio" class="ratio-value">0.00</span></div>
-    </div>
-
-    <div class="per-bag-section">
-      <div class="bags-input-group">
-        <label for="bagsInput">Number of Bags</label>
-        <input type="number" id="bagsInput" min="0" step="1" value="25">
-      </div>
-      <div class="per-bag-result" id="foodPerBag">Food per Bag: 0.00 g</div>
-      <div class="per-bag-result water" id="waterPerBag">Water per Bag: 0.00 g</div>
-      <div class="per-bag-result oz" id="waterOz">Water in oz: 0.00 oz</div>
-      <button id="addToInventoryBtn" class="inventory-btn">Add to Inventory</button>
-    </div>
-  </div>
-
-  <!-- Inventory Modal -->
-  <div id="inventoryModal" class="modal">
-    <div class="modal-content">
-      <h2>Add to Inventory</h2>
-      <div id="inventoryForm"></div>
-      <div class="modal-buttons">
-        <button id="cancelInventoryBtn" class="cancel-btn">Cancel</button>
-        <button id="saveInventoryBtn" class="save-btn-modal">Save to Inventory</button>
+      <div class="per-bag-section">
+        <div class="bags-input-group">
+          <label for="bagsInput">Number of Bags</label>
+          <input type="number" id="bagsInput" min="0" step="1" value="25">
+        </div>
+        <div class="per-bag-result" id="foodPerBag">Food per Bag: 0.00 g</div>
+        <div class="per-bag-result water" id="waterPerBag">Water per Bag: 0.00 g</div>
+        <div class="per-bag-result oz" id="waterOz">Water in oz: 0.00 oz</div>
+        <button id="addToInventoryBtn" class="inventory-btn">Add to Inventory</button>
       </div>
     </div>
-  </div>
 
-  <script src="theme.js"></script>
-  <script type="module" src="calc.js"></script>
+    <!-- Inventory Modal -->
+    <div id="inventoryModal" class="modal">
+      <div class="modal-content">
+        <h2>Add to Inventory</h2>
+        <div id="inventoryForm"></div>
+        <div class="modal-buttons">
+          <button id="cancelInventoryBtn" class="cancel-btn">Cancel</button>
+          <button id="saveInventoryBtn" class="save-btn-modal">Save to Inventory</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="theme.js"></script>
+    <script type="module" src="calc.js"></script>
 </body>
+
 </html>
