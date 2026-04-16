@@ -3,10 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Batch System</title>
+  <title>Batch Processing System</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<nav class="navbar">
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="Calc.html">Calculator</a>
+    <a href="inv.html">Inventory</a>
+  </div>
+
+  <div class="navbar-right">
+    <!-- Dark Mode Toggle -->
+    <button id="themeToggle" class="theme-toggle-btn">
+      🌙
+    </button>
+
+    <!-- User Profile -->
+    <div class="user-profile" id="userProfile">
+      <div class="user-avatar-container">
+        <img id="userAvatar" 
+             class="user-avatar" 
+             alt="User avatar" 
+             width="38" 
+             height="38"
+             src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&size=128">
+        <div class="user-info">
+          <span id="userName" class="user-name">Loading...</span>
+        </div>
+      </div>
+      
+      <button id="logoutBtn" class="logout-btn">
+        Logout
+      </button>
+    </div>
+  </div>
+</nav>
+
   <div class="container" style="text-align:center; margin-top:120px;">
     <h1>Batch Processing System</h1>
     <p style="margin:40px 0; font-size:1.25rem;">Choose your tool:</p>
@@ -22,6 +56,6 @@
   </div>
 
   <script src="theme.js"></script>
-  <script>initTheme();</script>
+  <script type="module" src="index.js"></script>
 </body>
 </html>

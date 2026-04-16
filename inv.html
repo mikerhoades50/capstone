@@ -7,34 +7,64 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Navigation Bar -->
-  <nav class="navbar">
-    <div class="nav-links">
-      <a href="index.html">Home</a>
-      <a href="Calc.html">Calculator</a>
-      <a href="inv.html">Inventory</a>
-    </div>
-  </nav>
-
-  <div class="container">
-    <div class="header">
-      <h1>Inventory Viewer</h1>
-      
-      <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap;">
-        <input type="text" id="searchInput" placeholder="Search inventory..." 
-               style="width: 320px; padding: 12px; font-size: 1.05rem;">
-        <button id="refreshBtn">Refresh</button>
-        <button id="addNewBtn">+ Add New Record</button>
-      </div>
-    </div>
-
-    <table id="invTable">
-      <thead id="invThead"></thead>
-      <tbody id="invTbody"></tbody>
-    </table>
-
-    <div id="status"></div>
+<nav class="navbar">
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="Calc.html">Calculator</a>
+    <a href="inv.html">Inventory</a>
   </div>
+
+  <div class="navbar-right">
+    <!-- Dark Mode Toggle -->
+    <button id="themeToggle" class="theme-toggle-btn">
+      🌙
+    </button>
+
+    <!-- User Profile -->
+    <div class="user-profile" id="userProfile">
+      <div class="user-avatar-container">
+        <img id="userAvatar" 
+             class="user-avatar" 
+             alt="User avatar" 
+             width="38" 
+             height="38"
+             src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&size=128">
+        <div class="user-info">
+          <span id="userName" class="user-name">Loading...</span>
+        </div>
+      </div>
+      
+      <button id="logoutBtn" class="logout-btn">
+        Logout
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="header">
+    <h1>Inventory Viewer</h1>
+    
+    <div class="inventory-controls">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="Search inventory..." 
+        class="search-input">
+      
+      <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+      <button id="addNewBtn" class="add-btn">+ Add New Record</button>
+      <button id="downloadCsvBtn" class="csv-btn">📥 Download CSV</button>
+    </div>
+  </div>
+
+  <table id="invTable">
+    <thead id="invThead"></thead>
+    <tbody id="invTbody"></tbody>
+  </table>
+
+  <div id="status"></div>
+</div>
 
   <!-- Record Modal -->
   <div id="recordModal" class="modal">

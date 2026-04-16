@@ -16,13 +16,38 @@
       <a href="Calc.html">Calculator</a>
       <a href="inv.html">Inventory</a>
     </div>
+
+    <div class="navbar-right">
+      <!-- Dark Mode Toggle -->
+      <button id="themeToggle" class="theme-toggle-btn">
+        🌙
+      </button>
+
+      <!-- User Profile -->
+      <div class="user-profile" id="userProfile">
+        <div class="user-avatar-container">
+          <img id="userAvatar" class="user-avatar" alt="User avatar" width="38" height="38"
+            src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&size=128">
+          <div class="user-info">
+            <span id="userName" class="user-name">Loading...</span>
+          </div>
+        </div>
+
+        <button id="logoutBtn" class="logout-btn">
+          Logout
+        </button>
+      </div>
+    </div>
   </nav>
+
 
   <div class="container">
     <div class="header">
       <h1>Batch Weight Calculator</h1>
 
-      <div style="display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 20px;">
+
+
+      <div style="display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 30px;">
         <div class="oil-card" id="oilCard">
           Batches until Oil Change<br>
           <span id="batchesUntilOil" style="font-size:1.8rem;">10</span>
@@ -30,56 +55,46 @@
         </div>
 
         <div class="machine-select-group">
-          <label for="userId">User ID:</label>
-          <select id="userId">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10" selected>10</option>
-          </select>
-
-          <label for="machineSize">Machine Size:</label>
-          <select id="machineSize">
+          <label for="machineSize" style="font-weight:600; margin-right:8px;">Machine Size:</label>
+          <select id="machineSize" style="padding:10px 16px; font-size:1.1rem; border-radius:8px;">
             <option value="small">Small</option>
             <option value="medium">Medium</option>
             <option value="large" selected>Large</option>
             <option value="xl">Extra Large</option>
           </select>
         </div>
+
       </div>
+    </div>
 
-      <div class="save-section" style="margin-bottom: 40px;">
-        <label for="foodName">Food Name:</label>
-        <input type="text" id="foodName" placeholder="e.g. Chicken, Salmon, Beef" style="min-width: 280px;">
-        <button id="saveToDbBtn" class="save-btn">💾 Save / Update Batch</button>
-        <button id="startNewBtn" class="reset-btn">Start New Batch</button>
-      </div>
+    <div class="save-section">
+      <label for="foodName" style="font-weight:600; margin-right:12px; white-space:nowrap;">Food Name:</label>
+      <input type="text" id="foodName" placeholder="e.g. Chicken, Salmon, Beef"
+        style="min-width: 320px; padding:12px 16px; font-size:1.1rem; border-radius:8px;">
 
-      <table id="dataTable">
-        <thead>
-          <tr>
-            <th>Weight Before</th>
-            <th>Weight After</th>
-            <th>Food Weight</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td>Total Before: <span id="totalA">0</span> g</td>
-            <td>Total After: <span id="totalB">0</span> g</td>
-            <td>Total Food: <span id="totalC">0</span> g</td>
-          </tr>
-        </tfoot>
-      </table>
+      <button id="saveToDbBtn" class="save-btn">💾 Save / Update Batch</button>
+      <button id="startNewBtn" class="reset-btn">Start New Batch</button>
+    </div>
 
-<div class="summary-box">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Weight Before</th>
+          <th>Weight After</th>
+          <th>Food Weight</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Total Before: <span id="totalA">0</span> g</td>
+          <td>Total After: <span id="totalB">0</span> g</td>
+          <td>Total Food: <span id="totalC">0</span> g</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="summary-box">
       <div class="summary-container">
         <div class="summary-card water" id="waterBox">
           Water Weight: <span id="waterWeight">0</span> g
@@ -93,32 +108,32 @@
       </div>
     </div>
 
-      <div class="per-bag-section">
-        <div class="bags-input-group">
-          <label for="bagsInput">Number of Bags</label>
-          <input type="number" id="bagsInput" min="0" step="1" value="25">
-        </div>
-        <div class="per-bag-result" id="foodPerBag">Food per Bag: 0.00 g</div>
-        <div class="per-bag-result water" id="waterPerBag">Water per Bag: 0.00 g</div>
-        <div class="per-bag-result oz" id="waterOz">Water in oz: 0.00 oz</div>
-        <button id="addToInventoryBtn" class="inventory-btn">Add to Inventory</button>
+    <div class="per-bag-section">
+      <div class="bags-input-group">
+        <label for="bagsInput">Number of Bags</label>
+        <input type="number" id="bagsInput" min="0" step="1" value="25">
+      </div>
+      <div class="per-bag-result" id="foodPerBag">Food per Bag: 0.00 g</div>
+      <div class="per-bag-result water" id="waterPerBag">Water per Bag: 0.00 g</div>
+      <div class="per-bag-result oz" id="waterOz">Water in oz: 0.00 oz</div>
+      <button id="addToInventoryBtn" class="inventory-btn">Add to Inventory</button>
+    </div>
+  </div>
+
+  <!-- Inventory Modal -->
+  <div id="inventoryModal" class="modal">
+    <div class="modal-content">
+      <h2>Add to Inventory</h2>
+      <div id="inventoryForm"></div>
+      <div class="modal-buttons">
+        <button id="cancelInventoryBtn" class="cancel-btn">Cancel</button>
+        <button id="saveInventoryBtn" class="save-btn-modal">Save to Inventory</button>
       </div>
     </div>
+  </div>
 
-    <!-- Inventory Modal -->
-    <div id="inventoryModal" class="modal">
-      <div class="modal-content">
-        <h2>Add to Inventory</h2>
-        <div id="inventoryForm"></div>
-        <div class="modal-buttons">
-          <button id="cancelInventoryBtn" class="cancel-btn">Cancel</button>
-          <button id="saveInventoryBtn" class="save-btn-modal">Save to Inventory</button>
-        </div>
-      </div>
-    </div>
-
-    <script src="theme.js"></script>
-    <script type="module" src="calc.js"></script>
+  <script src="theme.js"></script>
+  <script type="module" src="calc.js"></script>
 </body>
 
 </html>

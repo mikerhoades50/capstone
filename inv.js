@@ -1,26 +1,48 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-const SUPABASE_URL = 'https://woplbevwhogyiqpsnnct.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_N6tb1BKQ7XDuJJSg-tIs4g_r13llovy';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-const TABLE_NAME = 'inv';
-let allColumns = [];
-let editingKey = null;
-let currentData = [];
-let currentSort = { column: null, direction: 0 }; // 0=none, 1=asc, 2=desc
+import { supabase, requireAuth, logout } from './auth.js';
 
 const searchInput = document.getElementById('searchInput');
 const refreshBtn = document.getElementById('refreshBtn');
 const addNewBtn = document.getElementById('addNewBtn');
+const downloadCsvBtn = document.getElementById('downloadCsvBtn');
 const statusEl = document.getElementById('status');
 const tbody = document.getElementById('invTbody');
 const thead = document.getElementById('invThead');
 
+const userAvatar = document.getElementById('userAvatar');
+const userNameEl = document.getElementById('userName');
+const logoutBtn = document.getElementById('logoutBtn');
+
+let allColumns = [];
+let editingKey = null;
+let currentData = [];
+let currentSort = { column: null, direction: 0 };
+let currentUserId = null;
+
+// ====================== AUTH ======================
+async function initAuth() {
+  const user = await requireAuth();
+  if (!user) return;
+
+  currentUserId = user.id;
+  userNameEl.textContent = user.email.split('@')[0];
+  userAvatar.src = user.user_metadata?.avatar_url || 
+                   `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=3b82f6&color=fff&size=128`;
+
+  console.log('✅ Logged in as:', user.email);
+  fetchData();
+}
+
+// ====================== FETCH & RENDER ======================
 async function fetchData(searchTerm = '') {
+  if (!currentUserId) return;
+
   try {
     statusEl.textContent = 'Loading data...';
-    const { data, error } = await supabase.from(TABLE_NAME).select('*');
+
+    const { data, error } = await supabase
+      .from('inv')
+      .select('*')
+      .eq('"UserID_uuid"', currentUserId);
 
     if (error) throw error;
 
@@ -36,10 +58,78 @@ async function fetchData(searchTerm = '') {
     renderTable();
   } catch (err) {
     console.error(err);
-    statusEl.innerHTML = `Error: ${err.message}`;
+    statusEl.textContent = `Error: ${err.message}`;
   }
 }
 
+// ====================== CSV DOWNLOAD ======================
+function downloadCSV() {
+  if (currentData.length === 0) {
+    alert("No data to export");
+    return;
+  }
+
+  // Use the same columns and order as currently displayed
+  const headers = allColumns.map(col => col.replace(/_/g, ' ').toUpperCase());
+
+  let csvContent = headers.join(",") + "\n";
+
+  // Use the currently sorted/filtered data
+  let exportData = [...currentData];
+
+  // Apply current sort if active
+  if (currentSort.column) {
+    exportData.sort((a, b) => {
+      let valA = a[currentSort.column];
+      let valB = b[currentSort.column];
+      if (valA === null) valA = '';
+      if (valB === null) valB = '';
+
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return currentSort.direction === 1 ? valA - valB : valB - valA;
+      }
+      return String(valA).toLowerCase().localeCompare(String(valB).toLowerCase()) * 
+             (currentSort.direction === 1 ? 1 : -1);
+    });
+  }
+
+  exportData.forEach(row => {
+    const rowValues = allColumns.map(col => {
+      let val = row[col];
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string' && val.includes(',')) return `"${val}"`;
+      return val;
+    });
+    csvContent += rowValues.join(",") + "\n";
+  });
+
+  // === Use Central Time (America/Chicago) for filename ===
+  const now = new Date();
+  const centralTime = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+
+  const [month, day, year] = centralTime.split('/');
+  const fileDate = `${year}-${month}-${day}`;
+
+  // Trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `inventory_export_${fileDate}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  statusEl.textContent = `✅ Exported ${exportData.length} records to CSV`;
+  setTimeout(() => fetchData(searchInput.value.trim()), 1500);
+}
+// ====================== RENDER TABLE ======================
 function renderTable() {
   if (currentData.length === 0) {
     statusEl.textContent = 'No records found';
@@ -48,56 +138,37 @@ function renderTable() {
     return;
   }
 
-  allColumns = Object.keys(currentData[0]).filter(col => col.toLowerCase() !== 'key');
+  allColumns = Object.keys(currentData[0]).filter(col => 
+    !['key', 'Key', 'userid', 'userid_uuid', 'UserID', 'UserID_uuid'].includes(col.toLowerCase())
+  );
 
-  // Calculate QTY total
-  let qtyTotal = 0;
-  const qtyCol = allColumns.find(col => col.toLowerCase() === 'qty');
-  if (qtyCol) {
-    qtyTotal = currentData.reduce((sum, row) => sum + (parseFloat(row[qtyCol]) || 0), 0);
-  }
-
-  // Build header with sort + QTY total
   let headHTML = '<tr>';
   allColumns.forEach(col => {
     const isSorted = currentSort.column === col;
-    let sortClass = '';
-    let displayText = col.replace(/_/g, ' ').toUpperCase();
-
-    if (col.toLowerCase() === 'qty') {
-      displayText = `QTY (${Math.round(qtyTotal)})`;
-    }
-
-    if (isSorted) {
-      sortClass = currentSort.direction === 1 ? 'sorted-asc' : 'sorted-desc';
-    }
-
-    headHTML += `<th class="${sortClass}" data-col="${col}">${displayText}</th>`;
+    let sortSymbol = isSorted ? (currentSort.direction === 1 ? ' ↑' : ' ↓') : '';
+    headHTML += `<th data-col="${col}" style="cursor:pointer; user-select:none;">
+      ${col.replace(/_/g, ' ').toUpperCase()}${sortSymbol}
+    </th>`;
   });
-  headHTML += '<th style="width:80px;">Actions</th></tr>';
+  headHTML += '<th style="width:100px;">Actions</th></tr>';
   thead.innerHTML = headHTML;
 
-  // Sort data if active
   let sortedData = [...currentData];
   if (currentSort.column) {
     sortedData.sort((a, b) => {
       let valA = a[currentSort.column];
       let valB = b[currentSort.column];
-
       if (valA === null) valA = '';
       if (valB === null) valB = '';
 
       if (typeof valA === 'number' && typeof valB === 'number') {
         return currentSort.direction === 1 ? valA - valB : valB - valA;
       }
-
-      const strA = String(valA).toLowerCase();
-      const strB = String(valB).toLowerCase();
-      return currentSort.direction === 1 ? strA.localeCompare(strB) : strB.localeCompare(strA);
+      return String(valA).toLowerCase().localeCompare(String(valB).toLowerCase()) * 
+             (currentSort.direction === 1 ? 1 : -1);
     });
   }
 
-  // Build rows
   let rowsHTML = '';
   sortedData.forEach(row => {
     const key = row.Key || row.key;
@@ -105,15 +176,15 @@ function renderTable() {
     
     allColumns.forEach(col => {
       let val = row[col];
-      if (typeof val === 'number') val = Math.round(val);
       if (val === null || val === undefined) val = '';
+      if (typeof val === 'number') val = Math.round(val);
       rowsHTML += `<td>${val}</td>`;
     });
 
     rowsHTML += `
       <td style="text-align:center;">
-        <button class="edit-btn" data-key="${key}" style="background:none;border:none;color:var(--primary);font-size:1.3rem;cursor:pointer;">✏️</button>
-        <button class="delete-btn" data-key="${key}" style="background:none;border:none;color:var(--danger);font-size:1.4rem;cursor:pointer;margin-left:8px;">✕</button>
+        <button class="edit-btn" data-key="${key}" style="background:none;border:none;color:var(--primary);font-size:1.4rem;cursor:pointer;margin-right:12px;">✏️</button>
+        <button class="delete-btn" data-key="${key}" style="background:none;border:none;color:var(--danger);font-size:1.5rem;cursor:pointer;">✕</button>
       </td>
     </tr>`;
   });
@@ -129,7 +200,6 @@ function attachSortListeners() {
   document.querySelectorAll('th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
       const col = th.dataset.col;
-      
       if (currentSort.column === col) {
         currentSort.direction = (currentSort.direction + 1) % 3;
         if (currentSort.direction === 0) currentSort.column = null;
@@ -137,7 +207,6 @@ function attachSortListeners() {
         currentSort.column = col;
         currentSort.direction = 1;
       }
-      
       renderTable();
     });
   });
@@ -148,7 +217,7 @@ function attachActionListeners() {
     btn.addEventListener('click', (e) => {
       e.stopImmediatePropagation();
       const key = parseInt(btn.dataset.key);
-      editRecord(key);
+      if (key) editRecord(key);
     });
   });
 
@@ -156,50 +225,58 @@ function attachActionListeners() {
     btn.addEventListener('click', (e) => {
       e.stopImmediatePropagation();
       const key = parseInt(btn.dataset.key);
-      if (confirm('Delete this record?')) deleteRecord(key);
-    });
-  });
-
-  document.querySelectorAll('#invTbody tr').forEach(row => {
-    row.addEventListener('click', (e) => {
-      if (!e.target.closest('button')) {
-        const key = parseInt(row.dataset.key);
-        editRecord(key);
-      }
+      if (key && confirm('Delete this record?')) deleteRecord(key);
     });
   });
 }
 
-// Keep your existing editRecord, deleteRecord, buildModalForm, saveRecord functions
+// ====================== CRUD ======================
+async function deleteRecord(key) {
+  try {
+    statusEl.textContent = 'Deleting record...';
+
+    const { error } = await supabase
+      .from('inv')
+      .delete()
+      .eq('Key', key)
+      .eq('"UserID_uuid"', currentUserId);
+
+    if (error) throw error;
+
+    statusEl.textContent = '✅ Record deleted successfully';
+    setTimeout(() => fetchData(searchInput.value.trim()), 700);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = '❌ Delete failed';
+    alert('Failed to delete: ' + (err.message || err));
+  }
+}
+
 async function editRecord(key) {
   editingKey = key;
   document.getElementById('modalTitle').textContent = 'Edit Record';
 
   try {
-    const { data } = await supabase.from(TABLE_NAME).select('*').eq('Key', key).single();
-    if (!data) return;
-    buildModalForm(data);
+    const { data, error } = await supabase
+      .from('inv')
+      .select('*')
+      .eq('Key', key)
+      .eq('"UserID_uuid"', currentUserId)
+      .single();
+
+    if (error) throw error;
+    buildModalForm(data || {});
     document.getElementById('recordModal').style.display = 'flex';
   } catch (err) {
-    alert('Failed to load record');
-  }
-}
-
-async function deleteRecord(key) {
-  try {
-    const { error } = await supabase.from(TABLE_NAME).delete().eq('Key', key);
-    if (error) throw error;
-    fetchData(searchInput.value.trim());
-  } catch (err) {
-    alert('Failed to delete: ' + err.message);
+    alert('Failed to load record: ' + err.message);
   }
 }
 
 function buildModalForm(existingData = {}) {
   let formHTML = '';
   allColumns.forEach(col => {
-    const value = existingData[col] !== undefined ? existingData[col] : '';
-    const isNumber = typeof value === 'number' || col.toLowerCase().includes('qty');
+    const value = existingData[col] !== undefined && existingData[col] !== null ? existingData[col] : '';
+    const isNumber = col.toLowerCase().includes('qty') || col.toLowerCase().includes('key');
     formHTML += `
       <div class="form-group">
         <label>${col.replace(/_/g, ' ').toUpperCase()}</label>
@@ -217,17 +294,19 @@ async function saveRecord() {
     const input = document.getElementById(`field_${col}`);
     if (input) {
       let val = input.value.trim();
-      record[col] = val === '' ? null : (!isNaN(val) ? Number(val) : val);
+      record[col] = val === '' ? null : (isNaN(val) ? val : Number(val));
     }
   });
+
+  record["UserID_uuid"] = currentUserId;
 
   try {
     let error;
     if (editingKey !== null) {
-      ({ error } = await supabase.from(TABLE_NAME).update(record).eq('Key', editingKey));
+      ({ error } = await supabase.from('inv').update(record).eq('Key', editingKey));
     } else {
       delete record.Key;
-      ({ error } = await supabase.from(TABLE_NAME).insert([record]));
+      ({ error } = await supabase.from('inv').insert([record]));
     }
     if (error) throw error;
 
@@ -239,9 +318,10 @@ async function saveRecord() {
   }
 }
 
-// Event Listeners
+// ====================== EVENT LISTENERS ======================
 refreshBtn.addEventListener('click', () => fetchData(searchInput.value.trim()));
 searchInput.addEventListener('input', (e) => fetchData(e.target.value.trim()));
+downloadCsvBtn.addEventListener('click', downloadCSV);
 
 addNewBtn.addEventListener('click', () => {
   editingKey = null;
@@ -256,14 +336,9 @@ document.getElementById('cancelModalBtn').addEventListener('click', () => {
   editingKey = null;
 });
 
-document.getElementById('recordModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('recordModal')) {
-    document.getElementById('recordModal').style.display = 'none';
-    editingKey = null;
-  }
-});
+logoutBtn.addEventListener('click', logout);
 
-// Initial load
+// Start
 document.addEventListener('DOMContentLoaded', () => {
-  fetchData();
+  initAuth();
 });

@@ -1,24 +1,50 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-const SUPABASE_URL = 'https://woplbevwhogyiqpsnnct.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_N6tb1BKQ7XDuJJSg-tIs4g_r13llovy';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase, requireAuth, logout } from './auth.js';
 
 const machineSizeSelect = document.getElementById('machineSize');
-const userIdSelect = document.getElementById('userId');
 const foodNameInput = document.getElementById('foodName');
 const tableBody = document.getElementById('tableBody');
 const bagsInput = document.getElementById('bagsInput');
 const oilCard = document.getElementById('oilCard');
 const batchesUntilOilEl = document.getElementById('batchesUntilOil');
+const logoutBtn = document.getElementById('logoutBtn');
+
+const userAvatar = document.getElementById('userAvatar');
+const userNameEl = document.getElementById('userName');
 
 const sizeConfig = {
-  small: {rows:4, bags:10}, 
-  medium:{rows:5, bags:15}, 
-  large: {rows:6, bags:25}, 
-  xl:{rows:7, bags:35}
+  small: { rows: 4, bags: 10 },
+  medium: { rows: 5, bags: 15 },
+  large: { rows: 6, bags: 25 },
+  xl: { rows: 7, bags: 35 }
 };
 
+let currentUserId = null;
+
+// ====================== AUTH ======================
+async function initAuth() {
+  console.log('🔄 initAuth() started');
+
+  const user = await requireAuth();
+  if (!user) {
+    console.log('❌ No user returned from requireAuth');
+    return;
+  }
+
+  currentUserId = user.id;
+  console.log('✅ Logged in as:', user.email);
+
+  // Populate header
+  if (userNameEl) userNameEl.textContent = user.email.split('@')[0];
+
+  if (userAvatar) {
+    userAvatar.src = user.user_metadata?.avatar_url || 
+                     `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=3b82f6&color=fff&size=128`;
+  }
+
+  loadLastBatch();
+}
+
+// ====================== CORE CALCULATOR (rest of the file) ======================
 function getCurrentValues() {
   return {
     colA: Array.from(document.querySelectorAll('.col-a')).map(el => el.value),
@@ -43,11 +69,47 @@ function createRows(count, prevA = [], prevB = [], prevC = []) {
 }
 
 function attachInputListeners() {
-  document.getElementById('dataTable').addEventListener('input', updateTotals);
+  const table = document.getElementById('dataTable');
+  table.addEventListener('input', updateTotals);
+
+  const colA = Array.from(table.querySelectorAll('.col-a'));
+  const colB = Array.from(table.querySelectorAll('.col-b'));
+  const colC = Array.from(table.querySelectorAll('.col-c'));
+  const columns = [colA, colB, colC];
+
+  const allInputs = table.querySelectorAll('input[type="number"]');
+
+  allInputs.forEach(input => {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+
+        const currentList = input.classList.contains('col-a') ? colA :
+                           input.classList.contains('col-b') ? colB : colC;
+
+        const idx = currentList.indexOf(input);
+        let nextInput;
+
+        if (idx < currentList.length - 1) {
+          nextInput = currentList[idx + 1];
+        } else {
+          const currentColIndex = columns.indexOf(currentList);
+          const nextColIndex = (currentColIndex + 1) % 3;
+          nextInput = columns[nextColIndex][0];
+        }
+
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
+      }
+    });
+  });
 }
 
 function updateTotals() {
   let sumA = 0, sumB = 0, sumC = 0;
+
   document.querySelectorAll('.col-a').forEach(el => sumA += (parseFloat(el.value) || 0));
   document.querySelectorAll('.col-b').forEach(el => sumB += (parseFloat(el.value) || 0));
   document.querySelectorAll('.col-c').forEach(el => sumC += (parseFloat(el.value) || 0));
@@ -72,16 +134,16 @@ function updateTotals() {
   document.getElementById('waterOz').textContent = `Water in oz: ${(waterPerBag * 0.03527396).toFixed(2)} oz`;
 }
 
+// ====================== DATABASE ======================
 async function loadLastBatch() {
-  const userId = parseInt(userIdSelect.value);
-  const machineId = machineSizeSelect.value;
+  if (!currentUserId) return;
 
   try {
     const { data: batchData } = await supabase
       .from('batches')
       .select('*')
-      .eq('user_id', userId)
-      .eq('machine_id', machineId)
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
 
@@ -100,12 +162,11 @@ async function loadLastBatch() {
       if (b.food_name) foodNameInput.value = b.food_name;
     }
 
-    // Load oil change
     const { data: oilData } = await supabase
       .from('batches')
       .select('oil_change')
-      .eq('user_id', userId)
-      .eq('machine_id', machineId)
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
 
@@ -113,7 +174,6 @@ async function loadLastBatch() {
     const batchesLeft = 10 - oilChange;
 
     batchesUntilOilEl.textContent = batchesLeft;
-
     oilCard.classList.remove('oil-normal', 'oil-warning', 'oil-critical');
     if (batchesLeft <= 0) oilCard.classList.add('oil-critical');
     else if (batchesLeft <= 3) oilCard.classList.add('oil-warning');
@@ -126,10 +186,9 @@ async function loadLastBatch() {
 }
 
 async function saveBatchToDatabase() {
-  const userId = parseInt(userIdSelect.value);
-  const machineId = machineSizeSelect.value;
-  const foodName = foodNameInput.value.trim();
+  if (!currentUserId) return;
 
+  const foodName = foodNameInput.value.trim();
   if (!foodName) {
     alert("Please enter a Food Name before saving.");
     return;
@@ -139,12 +198,13 @@ async function saveBatchToDatabase() {
   const dryWeight = parseFloat(document.getElementById('totalB').textContent) || 0;
   const foodWeight = parseFloat(document.getElementById('totalC').textContent) || 0;
   const numBags = parseFloat(bagsInput.value) || 0;
-  const foodPerBag = parseFloat(document.getElementById('foodPerBag').textContent.split(':')[1]) || 0;
-  const waterAmount = parseFloat(document.getElementById('waterPerBag').textContent.split(':')[1]) || 0;
+  const foodPerBag = parseFloat(document.getElementById('foodPerBag').textContent.split(':')[1] || '0');
+  const waterAmount = parseFloat(document.getElementById('waterPerBag').textContent.split(':')[1] || '0');
 
   const batchData = {
-    user_id: userId,
-    machine_id: machineId,
+    user_id_uuid: currentUserId,
+    user_id: 0,
+    machine_id: machineSizeSelect.value,
     food_name: foodName,
     wet_weight: Math.round(wetWeight),
     dry_weight: Math.round(dryWeight),
@@ -153,15 +213,14 @@ async function saveBatchToDatabase() {
     water_amount: waterAmount,
     complete: false,
     food_per_bag: foodPerBag
-    // oil_change is preserved - NOT overwritten
   };
 
   try {
     const { data: latest } = await supabase
       .from('batches')
       .select('id, oil_change')
-      .eq('user_id', userId)
-      .eq('machine_id', machineId)
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
 
@@ -175,6 +234,9 @@ async function saveBatchToDatabase() {
     }
 
     if (error) throw error;
+
+    alert('✅ Batch saved successfully!');
+    startNewBatch();        // Clears the form after save
     loadLastBatch();
   } catch (err) {
     alert('❌ Failed to save batch:\n' + err.message);
@@ -191,10 +253,11 @@ function startNewBatch() {
   updateTotals();
 }
 
-/* ==================== Add to Inventory Functions ==================== */
-
+// ====================== INVENTORY MODAL ======================
+// ====================== INVENTORY MODAL ======================
 async function showAddToInventoryModal() {
-  const userId = parseInt(userIdSelect.value);
+  if (!currentUserId) return;
+
   const foodName = foodNameInput.value.trim() || "Unknown Food";
   const totalFoodQty = parseFloat(document.getElementById('totalC').textContent) || 0;
 
@@ -203,7 +266,7 @@ async function showAddToInventoryModal() {
     const { data } = await supabase
       .from('inv')
       .select('"Bin"')
-      .eq('"UserID"', userId)
+      .eq('"UserID_uuid"', currentUserId)
       .order('"Key"', { ascending: false })
       .limit(1);
     if (data && data.length > 0) lastBin = data[0].Bin || "";
@@ -212,7 +275,6 @@ async function showAddToInventoryModal() {
   const currentDate = new Date().toLocaleDateString('en-US', { month: '2-digit', year: '2-digit' }).replace('/', '/');
 
   const formHTML = `
-    <div class="form-group"><label>User ID</label><input type="number" id="invUserId" value="${userId}"></div>
     <div class="form-group"><label>Description</label><input type="text" id="invDescription" value="${foodName}"></div>
     <div class="form-group"><label>Qty</label><input type="number" id="invQty" value="${Math.round(totalFoodQty)}"></div>
     <div class="form-group"><label>Date (MM/YY)</label><input type="text" id="invDate" value="${currentDate}"></div>
@@ -227,11 +289,13 @@ async function showAddToInventoryModal() {
 }
 
 async function saveToInventory() {
-  const userId = parseInt(userIdSelect.value);
-  const machineId = machineSizeSelect.value;
+  if (!currentUserId) {
+    alert("You must be logged in.");
+    return;
+  }
 
   const record = {
-    "UserID": userId,
+    "UserID_uuid": currentUserId,
     "Description": document.getElementById('invDescription').value.trim(),
     "Qty": parseInt(document.getElementById('invQty').value) || 0,
     "Date": document.getElementById('invDate').value.trim(),
@@ -242,53 +306,58 @@ async function saveToInventory() {
   };
 
   try {
+    // Insert into inventory
     const { error: insertError } = await supabase.from('inv').insert([record]);
     if (insertError) throw insertError;
 
-    // Increment oil_change
-    const { data: current } = await supabase
+    // === Safely increment oil_change ===
+    const { data: currentBatch, error: fetchError } = await supabase
       .from('batches')
       .select('oil_change')
-      .eq('user_id', userId)
-      .eq('machine_id', machineId)
-      .limit(1);
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value)
+      .limit(1)
+      .single();
 
-    const currentOil = current && current.length > 0 ? (current[0].oil_change || 0) : 0;
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.warn('Could not fetch current oil value:', fetchError);
+    }
+
+    const currentOil = currentBatch?.oil_change || 0;
+    const newOil = currentOil + 1;
 
     const { error: updateError } = await supabase
       .from('batches')
-      .update({ oil_change: currentOil + 1 })
-      .eq('user_id', userId)
-      .eq('machine_id', machineId);
+      .update({ oil_change: newOil })
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value);
 
     if (updateError) throw updateError;
 
     document.getElementById('inventoryModal').style.display = 'none';
     loadLastBatch();
+    alert('✅ Successfully added to inventory and oil counter updated!');
   } catch (err) {
-    console.error(err);
+    console.error('Inventory save error:', err);
     alert('❌ Failed to add to inventory:\n' + (err.message || err));
   }
 }
 
 async function resetOilChange() {
-  const userId = parseInt(userIdSelect.value);
-  const machineId = machineSizeSelect.value;
-
+  if (!currentUserId) return;
   try {
-    const { error } = await supabase
+    await supabase
       .from('batches')
       .update({ oil_change: 0 })
-      .eq('user_id', userId)
-      .eq('machine_id', machineId);
-    if (error) throw error;
+      .eq('user_id_uuid', currentUserId)
+      .eq('machine_id', machineSizeSelect.value);
     loadLastBatch();
   } catch (err) {
     console.error(err);
   }
 }
 
-// Event Listeners
+// ====================== EVENT LISTENERS ======================
 document.getElementById('saveToDbBtn').addEventListener('click', saveBatchToDatabase);
 document.getElementById('startNewBtn').addEventListener('click', startNewBatch);
 document.getElementById('addToInventoryBtn').addEventListener('click', showAddToInventoryModal);
@@ -297,6 +366,8 @@ document.getElementById('cancelInventoryBtn').addEventListener('click', () => {
   document.getElementById('inventoryModal').style.display = 'none';
 });
 document.getElementById('resetOilBtn').addEventListener('click', resetOilChange);
+
+logoutBtn.addEventListener('click', logout);
 
 machineSizeSelect.addEventListener('change', () => {
   const size = machineSizeSelect.value;
@@ -310,14 +381,11 @@ machineSizeSelect.addEventListener('change', () => {
   if (bagsInput.value === "" || Object.values(sizeConfig).some(c => String(c.bags) === bagsInput.value)) {
     bagsInput.value = defaultBags;
   }
-  loadLastBatch();
+  if (currentUserId) loadLastBatch();
 });
 
-userIdSelect.addEventListener('change', loadLastBatch);
-
-// Initial load
 document.addEventListener('DOMContentLoaded', () => {
   createRows(6);
   updateTotals();
-  loadLastBatch();
+  initAuth();
 });
