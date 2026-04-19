@@ -1,4 +1,5 @@
-import { supabase, requireAuth, logout } from './auth.js';
+// calc.js - Updated for Group-based access
+import { supabase, requireAuth, logout, getUserGroupId } from './auth.js';
 
 const machineSizeSelect = document.getElementById('machineSize');
 const foodNameInput = document.getElementById('foodName');
@@ -18,7 +19,7 @@ const sizeConfig = {
   xl: { rows: 7, bags: 35 }
 };
 
-let currentUserId = null;
+let currentGroupId = null;
 
 // ====================== AUTH ======================
 async function initAuth() {
@@ -30,8 +31,15 @@ async function initAuth() {
     return;
   }
 
-  currentUserId = user.id;
-  console.log('✅ Logged in as:', user.email);
+  // Get or create the user's group
+  currentGroupId = await getUserGroupId();
+  
+  if (!currentGroupId) {
+    alert("Failed to initialize group. Please contact support.");
+    return;
+  }
+
+  console.log('✅ Logged in as:', user.email, 'Group ID:', currentGroupId);
 
   // Populate header
   if (userNameEl) userNameEl.textContent = user.email.split('@')[0];
@@ -44,7 +52,7 @@ async function initAuth() {
   loadLastBatch();
 }
 
-// ====================== CORE CALCULATOR (rest of the file) ======================
+// ====================== CORE CALCULATOR ======================
 function getCurrentValues() {
   return {
     colA: Array.from(document.querySelectorAll('.col-a')).map(el => el.value),
@@ -136,13 +144,13 @@ function updateTotals() {
 
 // ====================== DATABASE ======================
 async function loadLastBatch() {
-  if (!currentUserId) return;
+  if (!currentGroupId) return;
 
   try {
     const { data: batchData } = await supabase
       .from('batches')
       .select('*')
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
@@ -165,7 +173,7 @@ async function loadLastBatch() {
     const { data: oilData } = await supabase
       .from('batches')
       .select('oil_change')
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
@@ -186,7 +194,7 @@ async function loadLastBatch() {
 }
 
 async function saveBatchToDatabase() {
-  if (!currentUserId) return;
+  if (!currentGroupId) return;
 
   const foodName = foodNameInput.value.trim();
   if (!foodName) {
@@ -202,7 +210,7 @@ async function saveBatchToDatabase() {
   const waterAmount = parseFloat(document.getElementById('waterPerBag').textContent.split(':')[1] || '0');
 
   const batchData = {
-    user_id_uuid: currentUserId,
+    group_id: currentGroupId,           // Fixed
     user_id: 0,
     machine_id: machineSizeSelect.value,
     food_name: foodName,
@@ -219,7 +227,7 @@ async function saveBatchToDatabase() {
     const { data: latest } = await supabase
       .from('batches')
       .select('id, oil_change')
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value)
       .order('id', { ascending: false })
       .limit(1);
@@ -236,7 +244,7 @@ async function saveBatchToDatabase() {
     if (error) throw error;
 
     alert('✅ Batch saved successfully!');
-    startNewBatch();        // Clears the form after save
+    startNewBatch();
     loadLastBatch();
   } catch (err) {
     alert('❌ Failed to save batch:\n' + err.message);
@@ -254,9 +262,8 @@ function startNewBatch() {
 }
 
 // ====================== INVENTORY MODAL ======================
-// ====================== INVENTORY MODAL ======================
 async function showAddToInventoryModal() {
-  if (!currentUserId) return;
+  if (!currentGroupId) return;
 
   const foodName = foodNameInput.value.trim() || "Unknown Food";
   const totalFoodQty = parseFloat(document.getElementById('totalC').textContent) || 0;
@@ -266,7 +273,7 @@ async function showAddToInventoryModal() {
     const { data } = await supabase
       .from('inv')
       .select('"Bin"')
-      .eq('"UserID_uuid"', currentUserId)
+      .eq('group_id', currentGroupId)           // Fixed
       .order('"Key"', { ascending: false })
       .limit(1);
     if (data && data.length > 0) lastBin = data[0].Bin || "";
@@ -289,13 +296,13 @@ async function showAddToInventoryModal() {
 }
 
 async function saveToInventory() {
-  if (!currentUserId) {
+  if (!currentGroupId) {
     alert("You must be logged in.");
     return;
   }
 
   const record = {
-    "UserID_uuid": currentUserId,
+    group_id: currentGroupId,                    // Fixed
     "Description": document.getElementById('invDescription').value.trim(),
     "Qty": parseInt(document.getElementById('invQty').value) || 0,
     "Date": document.getElementById('invDate').value.trim(),
@@ -310,11 +317,11 @@ async function saveToInventory() {
     const { error: insertError } = await supabase.from('inv').insert([record]);
     if (insertError) throw insertError;
 
-    // === Safely increment oil_change ===
+    // Increment oil_change
     const { data: currentBatch, error: fetchError } = await supabase
       .from('batches')
       .select('oil_change')
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value)
       .limit(1)
       .single();
@@ -329,7 +336,7 @@ async function saveToInventory() {
     const { error: updateError } = await supabase
       .from('batches')
       .update({ oil_change: newOil })
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value);
 
     if (updateError) throw updateError;
@@ -344,12 +351,12 @@ async function saveToInventory() {
 }
 
 async function resetOilChange() {
-  if (!currentUserId) return;
+  if (!currentGroupId) return;
   try {
     await supabase
       .from('batches')
       .update({ oil_change: 0 })
-      .eq('user_id_uuid', currentUserId)
+      .eq('group_id', currentGroupId)
       .eq('machine_id', machineSizeSelect.value);
     loadLastBatch();
   } catch (err) {
@@ -381,7 +388,7 @@ machineSizeSelect.addEventListener('change', () => {
   if (bagsInput.value === "" || Object.values(sizeConfig).some(c => String(c.bags) === bagsInput.value)) {
     bagsInput.value = defaultBags;
   }
-  if (currentUserId) loadLastBatch();
+  if (currentGroupId) loadLastBatch();     // Fixed
 });
 
 document.addEventListener('DOMContentLoaded', () => {

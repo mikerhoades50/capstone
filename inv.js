@@ -1,4 +1,5 @@
-import { supabase, requireAuth, logout } from './auth.js';
+// inv.js - Updated for Group-based access
+import { supabase, requireAuth, logout, getUserGroupId } from './auth.js';
 
 const searchInput = document.getElementById('searchInput');
 const refreshBtn = document.getElementById('refreshBtn');
@@ -16,25 +17,42 @@ let allColumns = [];
 let editingKey = null;
 let currentData = [];
 let currentSort = { column: null, direction: 0 };
-let currentUserId = null;
+let currentGroupId = null;
 
 // ====================== AUTH ======================
 async function initAuth() {
+  console.log('🔄 initAuth() started');
+
   const user = await requireAuth();
-  if (!user) return;
+  if (!user) {
+    console.log('❌ No user returned from requireAuth');
+    return;
+  }
 
-  currentUserId = user.id;
-  userNameEl.textContent = user.email.split('@')[0];
-  userAvatar.src = user.user_metadata?.avatar_url || 
-                   `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=3b82f6&color=fff&size=128`;
+  // Get or create the user's group
+  currentGroupId = await getUserGroupId();
+  
+  if (!currentGroupId) {
+    alert("Failed to initialize group. Please contact support.");
+    return;
+  }
 
-  console.log('✅ Logged in as:', user.email);
-  fetchData();
+  console.log('✅ Logged in as:', user.email, 'Group ID:', currentGroupId);
+
+  // Populate header
+  if (userNameEl) userNameEl.textContent = user.email.split('@')[0];
+
+  if (userAvatar) {
+    userAvatar.src = user.user_metadata?.avatar_url || 
+                     `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=3b82f6&color=fff&size=128`;
+  }
+
+  fetchData();   // Load inventory data
 }
 
 // ====================== FETCH & RENDER ======================
 async function fetchData(searchTerm = '') {
-  if (!currentUserId) return;
+  if (!currentGroupId) return;
 
   try {
     statusEl.textContent = 'Loading data...';
@@ -42,7 +60,7 @@ async function fetchData(searchTerm = '') {
     const { data, error } = await supabase
       .from('inv')
       .select('*')
-      .eq('"UserID_uuid"', currentUserId);
+      .eq('group_id', currentGroupId);
 
     if (error) throw error;
 
@@ -69,15 +87,11 @@ function downloadCSV() {
     return;
   }
 
-  // Use the same columns and order as currently displayed
   const headers = allColumns.map(col => col.replace(/_/g, ' ').toUpperCase());
-
   let csvContent = headers.join(",") + "\n";
 
-  // Use the currently sorted/filtered data
   let exportData = [...currentData];
 
-  // Apply current sort if active
   if (currentSort.column) {
     exportData.sort((a, b) => {
       let valA = a[currentSort.column];
@@ -103,7 +117,6 @@ function downloadCSV() {
     csvContent += rowValues.join(",") + "\n";
   });
 
-  // === Use Central Time (America/Chicago) for filename ===
   const now = new Date();
   const centralTime = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
@@ -115,7 +128,6 @@ function downloadCSV() {
   const [month, day, year] = centralTime.split('/');
   const fileDate = `${year}-${month}-${day}`;
 
-  // Trigger download
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
@@ -129,6 +141,7 @@ function downloadCSV() {
   statusEl.textContent = `✅ Exported ${exportData.length} records to CSV`;
   setTimeout(() => fetchData(searchInput.value.trim()), 1500);
 }
+
 // ====================== RENDER TABLE ======================
 function renderTable() {
   if (currentData.length === 0) {
@@ -239,7 +252,7 @@ async function deleteRecord(key) {
       .from('inv')
       .delete()
       .eq('Key', key)
-      .eq('"UserID_uuid"', currentUserId);
+      .eq('group_id', currentGroupId);
 
     if (error) throw error;
 
@@ -261,7 +274,7 @@ async function editRecord(key) {
       .from('inv')
       .select('*')
       .eq('Key', key)
-      .eq('"UserID_uuid"', currentUserId)
+      .eq('group_id', currentGroupId)
       .single();
 
     if (error) throw error;
@@ -298,12 +311,12 @@ async function saveRecord() {
     }
   });
 
-  record["UserID_uuid"] = currentUserId;
+  record.group_id = currentGroupId;     // ← Fixed
 
   try {
     let error;
     if (editingKey !== null) {
-      ({ error } = await supabase.from('inv').update(record).eq('Key', editingKey));
+      ({ error } = await supabase.from('inv').update(record).eq('Key', editingKey).eq('group_id', currentGroupId));
     } else {
       delete record.Key;
       ({ error } = await supabase.from('inv').insert([record]));
