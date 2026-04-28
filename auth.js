@@ -91,6 +91,11 @@ export async function logout() {
   window.location.href = 'login.html';
 }
 
+function getRedirectURL(path = '/index.html') {
+  return window.location.origin + path;
+}
+export { getRedirectURL };
+
 // Auth state listener
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {

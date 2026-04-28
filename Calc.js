@@ -157,19 +157,43 @@ async function loadLastBatch() {
 
     if (batchData && batchData.length > 0) {
       const b = batchData[0];
-      const firstRow = tableBody.querySelector('tr');
-      if (firstRow) {
-        const inputs = firstRow.querySelectorAll('input');
-        if (inputs.length >= 3) {
-          inputs[0].value = Math.round(b.wet_weight || 0);
-          inputs[1].value = Math.round(b.dry_weight || 0);
-          inputs[2].value = Math.round(b.food_weight || 0);
+
+      // Restore grid data if it exists
+      if (b.grid_data && Array.isArray(b.grid_data) && b.grid_data.length > 0) {
+        const rowsCount = b.grid_data.length;
+        createRows(rowsCount);   // This will create the correct number of rows
+
+        // Fill in the values
+        const inputRows = tableBody.querySelectorAll('tr');
+        b.grid_data.forEach((row, index) => {
+          if (inputRows[index]) {
+            const inputs = inputRows[index].querySelectorAll('input');
+            if (inputs.length >= 3) {
+              inputs[0].value = row.before || '';
+              inputs[1].value = row.after || '';
+              inputs[2].value = row.food || '';
+            }
+          }
+        });
+      } 
+      // Fallback: old single row behavior
+      else if (b.wet_weight || b.dry_weight || b.food_weight) {
+        const firstRow = tableBody.querySelector('tr');
+        if (firstRow) {
+          const inputs = firstRow.querySelectorAll('input');
+          if (inputs.length >= 3) {
+            inputs[0].value = Math.round(b.wet_weight || 0);
+            inputs[1].value = Math.round(b.dry_weight || 0);
+            inputs[2].value = Math.round(b.food_weight || 0);
+          }
         }
       }
+
       if (b.num_bags) bagsInput.value = b.num_bags;
       if (b.food_name) foodNameInput.value = b.food_name;
     }
 
+    // Oil change logic (unchanged)
     const { data: oilData } = await supabase
       .from('batches')
       .select('oil_change')
@@ -192,7 +216,6 @@ async function loadLastBatch() {
     console.error('Load failed:', err);
   }
 }
-
 async function saveBatchToDatabase() {
   if (!currentGroupId) return;
 
@@ -202,6 +225,16 @@ async function saveBatchToDatabase() {
     return;
   }
 
+  // Get current grid values
+  const gridRows = Array.from(tableBody.querySelectorAll('tr')).map(tr => {
+    const inputs = tr.querySelectorAll('input');
+    return {
+      before: parseFloat(inputs[0].value) || 0,
+      after:  parseFloat(inputs[1].value) || 0,
+      food:   parseFloat(inputs[2].value) || 0
+    };
+  });
+
   const wetWeight = parseFloat(document.getElementById('totalA').textContent) || 0;
   const dryWeight = parseFloat(document.getElementById('totalB').textContent) || 0;
   const foodWeight = parseFloat(document.getElementById('totalC').textContent) || 0;
@@ -210,7 +243,7 @@ async function saveBatchToDatabase() {
   const waterAmount = parseFloat(document.getElementById('waterPerBag').textContent.split(':')[1] || '0');
 
   const batchData = {
-    group_id: currentGroupId,           // Fixed
+    group_id: currentGroupId,
     user_id: 0,
     machine_id: machineSizeSelect.value,
     food_name: foodName,
@@ -219,8 +252,9 @@ async function saveBatchToDatabase() {
     food_weight: Math.round(foodWeight),
     num_bags: Math.round(numBags),
     water_amount: waterAmount,
-    complete: false,
-    food_per_bag: foodPerBag
+    food_per_bag: foodPerBag,
+    grid_data: gridRows,                    // ← New: Save full grid
+    complete: false
   };
 
   try {
@@ -250,7 +284,6 @@ async function saveBatchToDatabase() {
     alert('❌ Failed to save batch:\n' + err.message);
   }
 }
-
 function startNewBatch() {
   document.querySelectorAll('.col-a, .col-b, .col-c').forEach(input => input.value = '');
   foodNameInput.value = '';

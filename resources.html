@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resources - Batch Processing System</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="resources.css">
+
+
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="Calc.html">Calculator</a>
+      <a href="inv.html">Inventory</a>
+      <a href="resources.html">Resources</a>
+    </div>
+
+    <div class="navbar-right">
+      <button id="themeToggle" class="theme-toggle-btn">🌙</button>
+
+      <div class="user-profile" id="userProfile">
+        <div class="user-avatar-container">
+          <img id="userAvatar" class="user-avatar" alt="User avatar" width="38" height="38"
+            src="https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&size=128">
+          <div class="user-info">
+            <span id="userName" class="user-name">Loading...</span>
+          </div>
+        </div>
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="resources-container">
+    <h1 style="text-align:center; margin-bottom:20px;">Resources</h1>
+    <p style="text-align:center; color:var(--text-secondary); font-size:1.1rem;">
+      Supplies, Equipment, and Helpful Content for Batch Processing
+    </p>
+
+    <!-- Supplies Section -->
+    <h2 class="section-title">Supplies</h2>
+    <div class="link-cards">
+
+      <!-- 1. 1 Pint Mylar Bags -->
+      <a href="https://www.amazon.com/dp/B0CKKK1HJ1" target="_blank" class="resource-card">
+        <img src="https://m.media-amazon.com/images/I/71pjVk7rb-L._SS284_.jpg" 
+             alt="50 Mylar Bags 1 Pint"
+             onerror="this.src='https://via.placeholder.com/600x400?text=Mylar+Bags'; this.onerror=null;">
+        <div class="content">
+          <h3>50 Mylar Bags - 1 Pint (6x8 Inch) - 7 Mil Thick</h3>
+          <p>Airtight gusseted zip-lock bags perfect for long-term food storage and freeze dryer use. Durable and high quality.</p>
+          <div class="source">Sophos Survival • Amazon</div>
+        </div>
+      </a>
+
+      <!-- 2. 1 Cup Mylar Bags -->
+      <a href="https://www.amazon.com/dp/B0D2PQ9M7D" target="_blank" class="resource-card">
+        <img src="https://m.media-amazon.com/images/I/71ZWV-eIZzL._SS284_.jpg" 
+             alt="50 Mylar Bags 1 Cup"
+             onerror="this.src='https://via.placeholder.com/600x400?text=Mylar+Bags'; this.onerror=null;">
+        <div class="content">
+          <h3>50 Mylar Bags - 1 Cup (5x7 Inch) - 7 Mil Thick</h3>
+          <p>Smaller airtight mylar bags ideal for portioning spices, snacks, and smaller batches of freeze-dried food.</p>
+          <div class="source">Sophos Survival • Amazon</div>
+        </div>
+      </a>
+
+      <!-- 3. 2 Gallon Mylar Bags -->
+      <a href="https://www.amazon.com/dp/B0DWK52331" target="_blank" class="resource-card">
+        <img src="https://m.media-amazon.com/images/I/716O9OxKYBL._SS284_.jpg" 
+             alt="2 Gallon Mylar Bags"
+             onerror="this.src='https://via.placeholder.com/600x400?text=Mylar+Bags'; this.onerror=null;">
+        <div class="content">
+          <h3>2 Gallon Mylar Bags - 60 Pack with Oxygen Absorbers & Labels</h3>
+          <p>Extra-large 10 mil thick mylar bags including oxygen absorbers and labels. Great for bulk long-term storage.</p>
+          <div class="source">Amazon</div>
+        </div>
+      </a>
+
+      <!-- 4. 500cc Oxygen Absorbers -->
+      <a href="https://www.amazon.com/dp/B0CX5GVVY7" target="_blank" class="resource-card">
+        <img src="https://m.media-amazon.com/images/I/81wM8p-nPaL._SS284_.jpg" 
+             alt="500cc Oxygen Absorbers"
+             onerror="this.src='https://via.placeholder.com/600x400?text=Oxygen+Absorbers'; this.onerror=null;">
+        <div class="content">
+          <h3>500cc Oxygen Absorbers for Food Storage - 100 Count</h3>
+          <p>Food-grade oxygen absorbers for use with mylar bags. Essential for long-term storage with Harvest Right freeze dryers.</p>
+          <div class="source">Amazon</div>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Equipment & Videos (placeholders) -->
+    <h2 class="section-title">Equipment</h2>
+    <div class="link-cards" id="equipmentCards">
+      <p style="grid-column: 1 / -1; text-align:center; color:#888; padding:60px 20px;">
+        Equipment recommendations coming soon...
+      </p>
+    </div>
+
+    <h2 class="section-title">Videos & Recipes</h2>
+    <div class="link-cards" id="videoCards">
+      <p style="grid-column: 1 / -1; text-align:center; color:#888; padding:60px 20px;">
+        Helpful videos and recipes coming soon...
+      </p>
+    </div>
+  </div>
+
+  <script src="theme.js"></script>
+  <script type="module" src="resources.js"></script>
+</body>
+</html>

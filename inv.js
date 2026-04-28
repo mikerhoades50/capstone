@@ -151,8 +151,8 @@ function renderTable() {
     return;
   }
 
-  allColumns = Object.keys(currentData[0]).filter(col => 
-    !['key', 'Key', 'userid', 'userid_uuid', 'UserID', 'UserID_uuid'].includes(col.toLowerCase())
+allColumns = Object.keys(currentData[0]).filter(col => 
+    !['key', 'Key', 'userid', 'userid_uuid', 'UserID', 'UserID_uuid', 'group_id', 'GroupID'].includes(col.toLowerCase())
   );
 
   let headHTML = '<tr>';
