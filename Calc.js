@@ -1,4 +1,4 @@
-// calc.js - Updated for Group-based access
+// calc.js - Updated for Group-based access with full grid saving
 import { supabase, requireAuth, logout, getUserGroupId } from './auth.js';
 
 const machineSizeSelect = document.getElementById('machineSize');
@@ -31,7 +31,6 @@ async function initAuth() {
     return;
   }
 
-  // Get or create the user's group
   currentGroupId = await getUserGroupId();
   
   if (!currentGroupId) {
@@ -41,7 +40,6 @@ async function initAuth() {
 
   console.log('✅ Logged in as:', user.email, 'Group ID:', currentGroupId);
 
-  // Populate header
   if (userNameEl) userNameEl.textContent = user.email.split('@')[0];
 
   if (userAvatar) {
@@ -63,6 +61,7 @@ function getCurrentValues() {
 
 function createRows(count, prevA = [], prevB = [], prevC = []) {
   tableBody.innerHTML = '';
+  
   for (let i = 0; i < count; i++) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -72,6 +71,7 @@ function createRows(count, prevA = [], prevB = [], prevC = []) {
     `;
     tableBody.appendChild(tr);
   }
+  
   attachInputListeners();
   updateTotals();
 }
@@ -147,7 +147,7 @@ async function loadLastBatch() {
   if (!currentGroupId) return;
 
   try {
-    const { data: batchData } = await supabase
+    const { data: batchData, error } = await supabase
       .from('batches')
       .select('*')
       .eq('group_id', currentGroupId)
@@ -155,54 +155,55 @@ async function loadLastBatch() {
       .order('id', { ascending: false })
       .limit(1);
 
-    if (batchData && batchData.length > 0) {
-      const b = batchData[0];
+    if (error) console.error('Error fetching batch:', error);
 
-      // Restore grid data if it exists
-      if (b.grid_data && Array.isArray(b.grid_data) && b.grid_data.length > 0) {
-        const rowsCount = b.grid_data.length;
-        createRows(rowsCount);   // This will create the correct number of rows
-
-        // Fill in the values
-        const inputRows = tableBody.querySelectorAll('tr');
-        b.grid_data.forEach((row, index) => {
-          if (inputRows[index]) {
-            const inputs = inputRows[index].querySelectorAll('input');
-            if (inputs.length >= 3) {
-              inputs[0].value = row.before || '';
-              inputs[1].value = row.after || '';
-              inputs[2].value = row.food || '';
-            }
-          }
-        });
-      } 
-      // Fallback: old single row behavior
-      else if (b.wet_weight || b.dry_weight || b.food_weight) {
-        const firstRow = tableBody.querySelector('tr');
-        if (firstRow) {
-          const inputs = firstRow.querySelectorAll('input');
-          if (inputs.length >= 3) {
-            inputs[0].value = Math.round(b.wet_weight || 0);
-            inputs[1].value = Math.round(b.dry_weight || 0);
-            inputs[2].value = Math.round(b.food_weight || 0);
-          }
-        }
-      }
-
-      if (b.num_bags) bagsInput.value = b.num_bags;
-      if (b.food_name) foodNameInput.value = b.food_name;
+    // No saved batch for this machine size → clear grid
+    if (!batchData || batchData.length === 0) {
+      console.log(`No saved data for machine: ${machineSizeSelect.value} → Clearing grid`);
+      startNewBatch();
+      return;
     }
 
-    // Oil change logic (unchanged)
-    const { data: oilData } = await supabase
-      .from('batches')
-      .select('oil_change')
-      .eq('group_id', currentGroupId)
-      .eq('machine_id', machineSizeSelect.value)
-      .order('id', { ascending: false })
-      .limit(1);
+    const b = batchData[0];
 
-    const oilChange = oilData && oilData.length > 0 ? (oilData[0].oil_change || 0) : 0;
+    // Restore full grid data
+    if (b.grid_data && Array.isArray(b.grid_data) && b.grid_data.length > 0) {
+      const savedRows = b.grid_data;
+      const targetRows = sizeConfig[machineSizeSelect.value].rows;
+
+      createRows(targetRows);
+
+      const inputRows = tableBody.querySelectorAll('tr');
+      savedRows.forEach((row, index) => {
+        if (inputRows[index]) {
+          const inputs = inputRows[index].querySelectorAll('input');
+          if (inputs.length >= 3) {
+            inputs[0].value = row.before != null ? row.before : '';
+            inputs[1].value = row.after != null ? row.after : '';
+            inputs[2].value = row.food != null ? row.food : '';
+          }
+        }
+      });
+    } 
+    // Fallback for old records
+    else if (b.wet_weight || b.dry_weight || b.food_weight) {
+      createRows(sizeConfig[machineSizeSelect.value].rows);
+      const firstRow = tableBody.querySelector('tr');
+      if (firstRow) {
+        const inputs = firstRow.querySelectorAll('input');
+        if (inputs.length >= 3) {
+          inputs[0].value = Math.round(b.wet_weight || 0);
+          inputs[1].value = Math.round(b.dry_weight || 0);
+          inputs[2].value = Math.round(b.food_weight || 0);
+        }
+      }
+    }
+
+    if (b.num_bags) bagsInput.value = b.num_bags;
+    if (b.food_name) foodNameInput.value = b.food_name;
+
+    // Oil change logic
+    const oilChange = b.oil_change || 0;
     const batchesLeft = 10 - oilChange;
 
     batchesUntilOilEl.textContent = batchesLeft;
@@ -212,10 +213,13 @@ async function loadLastBatch() {
     else oilCard.classList.add('oil-normal');
 
     updateTotals();
+
   } catch (err) {
     console.error('Load failed:', err);
+    startNewBatch();
   }
 }
+
 async function saveBatchToDatabase() {
   if (!currentGroupId) return;
 
@@ -253,7 +257,7 @@ async function saveBatchToDatabase() {
     num_bags: Math.round(numBags),
     water_amount: waterAmount,
     food_per_bag: foodPerBag,
-    grid_data: gridRows,                    // ← New: Save full grid
+    grid_data: gridRows,
     complete: false
   };
 
@@ -284,6 +288,7 @@ async function saveBatchToDatabase() {
     alert('❌ Failed to save batch:\n' + err.message);
   }
 }
+
 function startNewBatch() {
   document.querySelectorAll('.col-a, .col-b, .col-c').forEach(input => input.value = '');
   foodNameInput.value = '';
@@ -306,7 +311,7 @@ async function showAddToInventoryModal() {
     const { data } = await supabase
       .from('inv')
       .select('"Bin"')
-      .eq('group_id', currentGroupId)           // Fixed
+      .eq('group_id', currentGroupId)
       .order('"Key"', { ascending: false })
       .limit(1);
     if (data && data.length > 0) lastBin = data[0].Bin || "";
@@ -335,7 +340,7 @@ async function saveToInventory() {
   }
 
   const record = {
-    group_id: currentGroupId,                    // Fixed
+    group_id: currentGroupId,
     "Description": document.getElementById('invDescription').value.trim(),
     "Qty": parseInt(document.getElementById('invQty').value) || 0,
     "Date": document.getElementById('invDate').value.trim(),
@@ -346,11 +351,9 @@ async function saveToInventory() {
   };
 
   try {
-    // Insert into inventory
     const { error: insertError } = await supabase.from('inv').insert([record]);
     if (insertError) throw insertError;
 
-    // Increment oil_change
     const { data: currentBatch, error: fetchError } = await supabase
       .from('batches')
       .select('oil_change')
@@ -358,10 +361,6 @@ async function saveToInventory() {
       .eq('machine_id', machineSizeSelect.value)
       .limit(1)
       .single();
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.warn('Could not fetch current oil value:', fetchError);
-    }
 
     const currentOil = currentBatch?.oil_change || 0;
     const newOil = currentOil + 1;
@@ -413,15 +412,18 @@ machineSizeSelect.addEventListener('change', () => {
   const size = machineSizeSelect.value;
   const { rows: newRowCount, bags: defaultBags } = sizeConfig[size];
 
-  const prev = getCurrentValues();
-  const keepCount = Math.min(newRowCount, prev.colA.length);
+  const currentInputs = Array.from(tableBody.querySelectorAll('tr'));
+  const prevA = currentInputs.map(tr => tr.querySelector('.col-a').value);
+  const prevB = currentInputs.map(tr => tr.querySelector('.col-b').value);
+  const prevC = currentInputs.map(tr => tr.querySelector('.col-c').value);
 
-  createRows(newRowCount, prev.colA.slice(0, keepCount), prev.colB.slice(0, keepCount), prev.colC.slice(0, keepCount));
+  createRows(newRowCount, prevA, prevB, prevC);
 
   if (bagsInput.value === "" || Object.values(sizeConfig).some(c => String(c.bags) === bagsInput.value)) {
     bagsInput.value = defaultBags;
   }
-  if (currentGroupId) loadLastBatch();     // Fixed
+
+  if (currentGroupId) loadLastBatch();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
